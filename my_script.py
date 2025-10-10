@@ -1,32 +1,43 @@
+import sys
+import time
 import requests
 from bs4 import BeautifulSoup
-import sys
-import traceback
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
 
+# ⚡ تنظیم UTF-8 برای خروجی فارسی
 sys.stdout.reconfigure(encoding='utf-8')
 
-# ========================
-# 📌 تابع استخراج P/E از سایت بورس ویو (bv.emofid.com)
-# ========================
-def fetch_pe_from_bourseview():
-    url = "https://bv.emofid.com/market"
+# ==========================
+# 📌 P/E با Selenium (bv.emofid.com)
+# ==========================
+def fetch_pe_with_selenium():
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     try:
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
+        driver.get("https://bv.emofid.com/market")
+        time.sleep(5)  # صبر برای لود JS
+
+        selector = (
+            "body > app-root > div > main > ng-component > main > ng-component > main > "
+            "article:nth-child(9) > bvm-financial-coefficients > div > main > "
+            "div.mt-3.d-flex.align-items-center.px-3 > div.me-2.bvm-fs-2.bvm-fw-500.bvm-color-gray"
+        )
+        pe_elem = driver.find_element(By.CSS_SELECTOR, selector)
+        pe_value = pe_elem.text
     except Exception as e:
-        print("❌ خطا در اتصال به bv.emofid.com:", e)
-        return "خطا در اتصال"
+        print("❌ خطا در گرفتن P/E با Selenium:", e)
+        pe_value = "خطا"
+    finally:
+        driver.quit()
 
-    soup = BeautifulSoup(resp.text, "html.parser")
-    selector = (
-        "body > app-root > div > main > ng-component > main > ng-component > main > "
-        "article:nth-child(9) > bvm-financial-coefficients > div > main > "
-        "div.mt-3.d-flex.align-items-center.px-3 > div.me-2.bvm-fs-2.bvm-fw-500.bvm-color-gray"
-    )
-
-    pe_element = soup.select_one(selector)
-    return pe_element.get_text(strip=True) if pe_element else "پیدا نشد"
-
+    return pe_value
 
 # ========================
 # 📌 تابع استخراج داده‌ها از سایت bourse-trader.ir
@@ -102,7 +113,7 @@ def main():
     print("در حال استخراج اطلاعات...\n")
 
     try:
-        pe = fetch_pe_from_bourseview()
+        pe = fetch_pe_with_selenium()
         print(f"P/E بازار: {pe}\n")
     except Exception:
         print("❌ خطا در دریافت P/E:")
