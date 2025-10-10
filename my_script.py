@@ -1,1 +1,122 @@
+import requests
+from bs4 import BeautifulSoup
+import sys
+import traceback
 
+sys.stdout.reconfigure(encoding='utf-8')
+
+# ========================
+# 📌 تابع استخراج P/E از سایت بورس ویو (bv.emofid.com)
+# ========================
+def fetch_pe_from_bourseview():
+    url = "https://bv.emofid.com/market"
+    try:
+        resp = requests.get(url, timeout=15)
+        resp.raise_for_status()
+    except Exception as e:
+        print("❌ خطا در اتصال به bv.emofid.com:", e)
+        return "خطا در اتصال"
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+    selector = (
+        "body > app-root > div > main > ng-component > main > ng-component > main > "
+        "article:nth-child(9) > bvm-financial-coefficients > div > main > "
+        "div.mt-3.d-flex.align-items-center.px-3 > div.me-2.bvm-fs-2.bvm-fw-500.bvm-color-gray"
+    )
+
+    pe_element = soup.select_one(selector)
+    return pe_element.get_text(strip=True) if pe_element else "پیدا نشد"
+
+
+# ========================
+# 📌 تابع استخراج داده‌ها از سایت bourse-trader.ir
+# ========================
+def fetch_from_bourse_trader():
+    try:
+        resp = requests.get("https://bourse-trader.ir/", timeout=15)
+        resp.raise_for_status()
+    except Exception as e:
+        print("❌ خطا در اتصال به bourse-trader.ir:", e)
+        return {"خطا": "اتصال برقرار نشد"}
+        
+    soup = BeautifulSoup(resp.text, "html.parser")
+    data = {}
+
+    # ارزش معاملات خرد
+    selector_val = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(6) > div.col-xl-3.col-lg-6.col-md-5.col-sm-12.my-2 > div > div > table > tbody > tr:nth-child(4) > td.bl-colu > a"
+    elem_val = soup.select_one(selector_val)
+    data["ارزش معاملات خرد"] = elem_val.get_text(strip=True) if elem_val else "پیدا نشد"
+
+    # ورود پول حقیقی
+    selector_real = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(6) > div.col-xl-3.col-lg-6.col-md-5.col-sm-12.my-2 > div > div > table > tbody > tr:nth-child(11) > td.bl-colu > a"
+    elem_real = soup.select_one(selector_real)
+    data["ورود پول حقیقی"] = elem_real.get_text(strip=True) if elem_real else "پیدا نشد"
+
+    # ورود پول به صندوق درآمد ثابت
+    selector_fixed = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(6) > div.col-xl-3.col-lg-6.col-md-5.col-sm-12.my-2 > div > div > table > tbody > tr:nth-child(12) > td.bl-colu > a"
+    elem_fixed = soup.select_one(selector_fixed)
+    data["ورود پول صندوق درآمد ثابت"] = elem_fixed.get_text(strip=True) if elem_fixed else "پیدا نشد"
+
+    # ورود پول به صندوق کالایی
+    selector_commodity = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(6) > div.col-xl-3.col-lg-6.col-md-5.col-sm-12.my-2 > div > div > table > tbody > tr:nth-child(13) > td.bl-colu > a"
+    elem_commodity = soup.select_one(selector_commodity)
+    data["ورود پول صندوق کالایی"] = elem_commodity.get_text(strip=True) if elem_commodity else "پیدا نشد"
+
+    # بیشترین ورود پول حقیقی (جدول کامل)
+    selector_top_real = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(10) > div:nth-child(4) > div > div > table > tbody"
+    table_real = soup.select_one(selector_top_real)
+    if table_real:
+        rows = table_real.find_all("tr")
+        stocks = [r.get_text(" | ", strip=True) for r in rows]
+        data["بیشترین ورود پول حقیقی"] = "\n".join(stocks) if stocks else "داده‌ای نیست"
+    else:
+        data["بیشترین ورود پول حقیقی"] = "پیدا نشد"
+
+    # بیشترین ورود پول حقوقی
+    selector_top_legal = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(10) > div:nth-child(3) > div > div > table > tbody"
+    table_legal = soup.select_one(selector_top_legal)
+    if table_legal:
+        rows = table_legal.find_all("tr")
+        stocks = [r.get_text(" | ", strip=True) for r in rows]
+        data["بیشترین ورود پول حقوقی"] = "\n".join(stocks) if stocks else "داده‌ای نیست"
+    else:
+        data["بیشترین ورود پول حقوقی"] = "پیدا نشد"
+
+    # سهامی که از منفی به مثبت رفته‌اند
+    selector_turned = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(12) > div:nth-child(3) > div > div > table > tbody"
+    table_turned = soup.select_one(selector_turned)
+    if table_turned:
+        rows = table_turned.find_all("tr")
+        stocks = [r.get_text(" | ", strip=True) for r in rows]
+        data["سهامی که از منفی به مثبت رفته‌اند"] = "\n".join(stocks) if stocks else "داده‌ای نیست"
+    else:
+        data["سهامی که از منفی به مثبت رفته‌اند"] = "پیدا نشد"
+
+    return data
+
+
+# ========================
+# 📌 اجرای اصلی
+# ========================
+def main():
+    print("در حال استخراج اطلاعات...\n")
+
+    try:
+        pe = fetch_pe_from_bourseview()
+        print(f"P/E بازار: {pe}\n")
+    except Exception:
+        print("❌ خطا در دریافت P/E:")
+        traceback.print_exc()
+
+    try:
+        trader_data = fetch_from_bourse_trader()
+        print("📊 داده‌های سایت Bourse-Trader:")
+        for k, v in trader_data.items():
+            print(f"{k}: {v}")
+    except Exception:
+        print("❌ خطا در دریافت داده‌های Bourse-Trader:")
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()
