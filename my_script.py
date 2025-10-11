@@ -1,43 +1,9 @@
 import sys
-import time
 import requests
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from webdriver_manager.chrome import ChromeDriverManager
 
 # ⚡ تنظیم UTF-8 برای خروجی فارسی
 sys.stdout.reconfigure(encoding='utf-8')
-
-# ==========================
-# 📌 P/E با Selenium (bv.emofid.com)
-# ==========================
-def fetch_pe_with_selenium():
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    try:
-        driver.get("https://bv.emofid.com/market")
-        time.sleep(5)  # صبر برای لود JS
-
-        selector = (
-            "body > app-root > div > main > ng-component > main > ng-component > main > "
-            "article:nth-child(9) > bvm-financial-coefficients > div > main > "
-            "div.mt-3.d-flex.align-items-center.px-3 > div.me-2.bvm-fs-2.bvm-fw-500.bvm-color-gray"
-        )
-        pe_elem = driver.find_element(By.CSS_SELECTOR, selector)
-        pe_value = pe_elem.text
-    except Exception as e:
-        print("❌ خطا در گرفتن P/E با Selenium:", e)
-        pe_value = "خطا"
-    finally:
-        driver.quit()
-
-    return pe_value
 
 # ========================
 # 📌 تابع استخراج داده‌ها از سایت bourse-trader.ir
@@ -73,7 +39,7 @@ def fetch_from_bourse_trader():
     elem_commodity = soup.select_one(selector_commodity)
     data["ورود پول صندوق کالایی"] = elem_commodity.get_text(strip=True) if elem_commodity else "پیدا نشد"
 
-    # بیشترین ورود پول حقیقی (جدول کامل)
+    # بیشترین ورود پول حقیقی
     selector_top_real = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(10) > div:nth-child(4) > div > div > table > tbody"
     table_real = soup.select_one(selector_top_real)
     if table_real:
@@ -110,23 +76,11 @@ def fetch_from_bourse_trader():
 # 📌 اجرای اصلی
 # ========================
 def main():
-    print("در حال استخراج اطلاعات...\n")
-
-    try:
-        pe = fetch_pe_with_selenium()
-        print(f"P/E بازار: {pe}\n")
-    except Exception:
-        print("❌ خطا در دریافت P/E:")
-        traceback.print_exc()
-
-    try:
-        trader_data = fetch_from_bourse_trader()
-        print("📊 داده‌های سایت Bourse-Trader:")
-        for k, v in trader_data.items():
-            print(f"{k}: {v}")
-    except Exception:
-        print("❌ خطا در دریافت داده‌های Bourse-Trader:")
-        traceback.print_exc()
+    print("در حال استخراج اطلاعات از bourse-trader.ir...\n")
+    trader_data = fetch_from_bourse_trader()
+    print("📊 داده‌های سایت Bourse-Trader:")
+    for k, v in trader_data.items():
+        print(f"{k}: {v}")
 
 
 if __name__ == "__main__":
