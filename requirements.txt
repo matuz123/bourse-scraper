@@ -1,3 +1,2 @@
-sys
 requests
 beautifulsoup4
