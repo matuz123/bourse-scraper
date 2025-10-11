@@ -1,6 +1,7 @@
 import sys
 import requests
 from bs4 import BeautifulSoup
+from flask import Flask, jsonify
 
 # ⚡ تنظیم UTF-8 برای خروجی فارسی
 sys.stdout.reconfigure(encoding='utf-8')
@@ -73,15 +74,20 @@ def fetch_from_bourse_trader():
 
 
 # ========================
-# 📌 اجرای اصلی
+# 🌐 وب‌سرور Flask
 # ========================
-def main():
-    print("در حال استخراج اطلاعات از bourse-trader.ir...\n")
-    trader_data = fetch_from_bourse_trader()
-    print("📊 داده‌های سایت Bourse-Trader:")
-    for k, v in trader_data.items():
-        print(f"{k}: {v}")
+app = Flask(__name__)
 
+@app.route("/")
+def home():
+    return "✅ سرور فعال است. برای دریافت داده‌ها به /fetch بروید."
+
+@app.route("/fetch")
+def fetch_data():
+    print("🚀 درخواست جدید برای گرفتن داده‌ها دریافت شد...")
+    data = fetch_from_bourse_trader()
+    print("✅ داده‌ها استخراج شدند")
+    return jsonify(data)  # برمی‌گردونه به صورت JSON
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=10000)
