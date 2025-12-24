@@ -16,61 +16,60 @@ def fetch_from_bourse_trader():
     except Exception as e:
         print("❌ خطا در اتصال به bourse-trader.ir:", e)
         return {"خطا": "اتصال برقرار نشد"}
-        
+
     soup = BeautifulSoup(resp.text, "html.parser")
     data = {}
 
-    # ارزش معاملات خرد
-    selector_val = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(6) > div.col-xl-3.col-lg-6.col-md-5.col-sm-12.my-2 > div > div > table > tbody > tr:nth-child(4) > td.bl-colu > a"
-    elem_val = soup.select_one(selector_val)
-    data["ارزش معاملات خرد"] = elem_val.get_text(strip=True) if elem_val else "پیدا نشد"
+    def get_value_by_label(label):
+        td = soup.find("td", string=lambda t: t and label in t)
+        if not td:
+            return "پیدا نشد"
+        val_td = td.find_next_sibling("td")
+        if not val_td:
+            return "پیدا نشد"
+        a = val_td.find("a")
+        return a.get_text(strip=True) if a else val_td.get_text(strip=True)
 
-    # ورود پول حقیقی
-    selector_real = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(6) > div.col-xl-3.col-lg-6.col-md-5.col-sm-12.my-2 > div > div > table > tbody > tr:nth-child(11) > td.bl-colu > a"
-    elem_real = soup.select_one(selector_real)
-    data["ورود پول حقیقی"] = elem_real.get_text(strip=True) if elem_real else "پیدا نشد"
-
-    # ورود پول به صندوق درآمد ثابت
-    selector_fixed = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(6) > div.col-xl-3.col-lg-6.col-md-5.col-sm-12.my-2 > div > div > table > tbody > tr:nth-child(12) > td.bl-colu > a"
-    elem_fixed = soup.select_one(selector_fixed)
-    data["ورود پول صندوق درآمد ثابت"] = elem_fixed.get_text(strip=True) if elem_fixed else "پیدا نشد"
-
-    # ورود پول به صندوق کالایی
-    selector_commodity = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(6) > div.col-xl-3.col-lg-6.col-md-5.col-sm-12.my-2 > div > div > table > tbody > tr:nth-child(13) > td.bl-colu > a"
-    elem_commodity = soup.select_one(selector_commodity)
-    data["ورود پول صندوق کالایی"] = elem_commodity.get_text(strip=True) if elem_commodity else "پیدا نشد"
-
-    # بیشترین ورود پول حقیقی
-    selector_top_real = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(10) > div:nth-child(4) > div > div > table > tbody"
-    table_real = soup.select_one(selector_top_real)
-    if table_real:
-        rows = table_real.find_all("tr")
-        stocks = [r.get_text(" | ", strip=True) for r in rows]
-        data["بیشترین ورود پول حقیقی"] = "\n".join(stocks) if stocks else "داده‌ای نیست"
-    else:
-        data["بیشترین ورود پول حقیقی"] = "پیدا نشد"
-
-    # بیشترین ورود پول حقوقی
-    selector_top_legal = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(10) > div:nth-child(3) > div > div > table > tbody"
-    table_legal = soup.select_one(selector_top_legal)
-    if table_legal:
-        rows = table_legal.find_all("tr")
-        stocks = [r.get_text(" | ", strip=True) for r in rows]
-        data["بیشترین ورود پول حقوقی"] = "\n".join(stocks) if stocks else "داده‌ای نیست"
-    else:
-        data["بیشترین ورود پول حقوقی"] = "پیدا نشد"
-
-    # سهامی که از منفی به مثبت رفته‌اند
-    selector_turned = "body > div.container-fullwidth.trader_container > div:nth-child(4) > div:nth-child(12) > div:nth-child(3) > div > div > table > tbody"
-    table_turned = soup.select_one(selector_turned)
-    if table_turned:
-        rows = table_turned.find_all("tr")
-        stocks = [r.get_text(" | ", strip=True) for r in rows]
-        data["سهامی که از منفی به مثبت رفته‌اند"] = "\n".join(stocks) if stocks else "داده‌ای نیست"
-    else:
-        data["سهامی که از منفی به مثبت رفته‌اند"] = "پیدا نشد"
+    data["ارزش معاملات خرد"] = get_value_by_label("ارزش معاملات خرد")
+    data["ورود پول حقیقی"] = get_value_by_label("ورود پول حقیقی")
+    data["ورود پول صندوق درآمد ثابت"] = get_value_by_label("ورود پول صندوق درآمدثابت")
+    data["ورود پول صندوق کالایی"] = get_value_by_label("ورود پول صندوق کالایی")
 
     return data
+    
+def fetch_top_real_money(soup):
+    data = []
+    
+    # پیدا کردن تیبل مربوط به بیشترین ورود پول حقیقی
+    header = soup.find("h2", string=lambda t: t and "بیشترین ورود پول حقیقی" in t)
+    if not header:
+        return ["پیدا نشد"]
+
+    table = header.find_next("table")
+    if not table:
+        return ["پیدا نشد"]
+
+    tbody = table.find("tbody")
+    if not tbody:
+        return ["پیدا نشد"]
+
+    rows = tbody.find_all("tr")
+    
+    for r in rows:
+        cols = r.find_all("td")
+        if len(cols) < 5:
+            continue
+        
+        data.append({
+            "نماد": cols[0].get_text(strip=True),
+            "قیمت آخر": cols[1].get_text(strip=True),
+            "خرید حقیقی": cols[2].get_text(strip=True),
+            "حجم": cols[3].get_text(strip=True),
+            "ورود پول": cols[4].get_text(strip=True),
+        })
+
+    return data
+    
 
 
 # ========================
